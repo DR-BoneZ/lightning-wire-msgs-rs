@@ -33,12 +33,12 @@ pub enum EncodedItem<T> {
     Expected(T),
     TLV(Option<T>, u64),
 }
-impl<'a, T> From<(Option<&'a T>, u64)> for EncodedItem<&'a dyn WireItemBoxedWriter>
+impl<'a, T> From<(&'a Option<T>, u64)> for EncodedItem<&'a dyn WireItemBoxedWriter>
 where
     T: WireItemBoxedWriter,
 {
-    fn from(tup: (Option<&'a T>, u64)) -> Self {
-        EncodedItem::TLV(tup.0.map(|t| t as &dyn WireItemBoxedWriter), tup.1)
+    fn from(tup: (&'a Option<T>, u64)) -> Self {
+        EncodedItem::TLV(tup.0.as_ref().map(|t| t as &dyn WireItemBoxedWriter), tup.1)
     }
 }
 impl<'a, T> From<(&'a T,)> for EncodedItem<&'a dyn WireItemBoxedWriter>

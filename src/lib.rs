@@ -1,7 +1,10 @@
+#[macro_use]
+extern crate lightning_wire_msgs_derive;
+
 use std::borrow::Borrow;
 use std::io::Write;
 
-mod watchtower;
+pub mod watchtower;
 
 fn write_varint<W: Write>(num: u64, w: &mut W) -> std::io::Result<usize> {
     match num {
@@ -27,15 +30,17 @@ fn write_varint<W: Write>(num: u64, w: &mut W) -> std::io::Result<usize> {
     }
 }
 
-pub trait WireMessage {
+pub trait WireMessage<'a>
+where
+    &'a Self: IntoIterator<Item = &'a dyn WireItemBoxedWriter> + 'a,
+{
     fn msg_type(&self) -> u16;
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<Item = &'a dyn WireItemBoxedWriter> + 'a>;
 
-    fn write_to<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+    fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize> {
         let mut count = 0;
         count += w.write(&u16::to_be_bytes(self.msg_type()))?;
         let mut boxed_w: Box<&mut dyn Write> = Box::new(w);
-        for item in self.iter() {
+        for item in (&self).into_iter() {
             count += item.write_to_boxed(&mut boxed_w)?;
         }
         w.flush()?;

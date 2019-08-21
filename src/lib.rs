@@ -1,3 +1,5 @@
+#![feature(never_type)]
+
 #[macro_use]
 extern crate lightning_wire_msgs_derive;
 
@@ -33,40 +35,62 @@ pub enum EncodedItem<T> {
     Expected(T),
     TLV(Option<T>, u64),
 }
-impl<'a, T> From<(&'a Option<T>, u64)> for EncodedItem<&'a dyn WireItemBoxedWriter>
+impl<'a, T, U> From<(&'a Option<T>, u64)> for EncodedItem<U>
 where
-    T: WireItemBoxedWriter,
+    U: From<&'a T>,
 {
     fn from(tup: (&'a Option<T>, u64)) -> Self {
-        EncodedItem::TLV(tup.0.as_ref().map(|t| t as &dyn WireItemBoxedWriter), tup.1)
+        EncodedItem::TLV(tup.0.as_ref().map(U::from), tup.1)
     }
 }
-impl<'a, T> From<(&'a T,)> for EncodedItem<&'a dyn WireItemBoxedWriter>
+impl<'a, T, U> From<(&'a T,)> for EncodedItem<U>
 where
-    T: WireItemBoxedWriter,
+    U: From<&'a T>,
 {
     fn from(tup: (&'a T,)) -> Self {
-        EncodedItem::Expected(tup.0 as &'a dyn WireItemBoxedWriter)
+        EncodedItem::Expected(U::from(tup.0))
+    }
+}
+
+pub trait AnyWireMessage<'a> {
+    fn msg_type(&self) -> u16;
+
+    fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize>;
+}
+
+impl<'a, T> AnyWireMessage<'a> for T
+where
+    T: WireMessage<'a>,
+    &'a T: IntoIterator<Item = EncodedItem<T::Item>> + 'a,
+{
+    fn msg_type(&self) -> u16 {
+        T::MSG_TYPE
+    }
+
+    fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize> {
+        self.write_to(w)
     }
 }
 
 pub trait WireMessage<'a>
 where
-    &'a Self: IntoIterator<Item = EncodedItem<&'a dyn WireItemBoxedWriter>> + 'a,
+    &'a Self: IntoIterator<Item = EncodedItem<Self::Item>> + 'a,
 {
-    fn msg_type(&self) -> u16;
+    type Item: WireItem;
+
+    const MSG_TYPE: u16;
 
     fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize> {
         let mut count = 0;
-        count += w.write(&u16::to_be_bytes(self.msg_type()))?;
+        count += w.write(&u16::to_be_bytes(Self::MSG_TYPE))?;
         let mut boxed_w: Box<&mut dyn Write> = Box::new(w);
         for item in (&self).into_iter() {
             match item {
                 EncodedItem::Expected(t) => {
-                    count += t.write_to_boxed(&mut boxed_w, None)?;
+                    count += t.write_to(&mut boxed_w, None)?;
                 }
                 EncodedItem::TLV(Some(t), tlv_type) => {
-                    count += t.write_to_boxed(&mut boxed_w, Some(tlv_type))?;
+                    count += t.write_to(&mut boxed_w, Some(tlv_type))?;
                 }
                 _ => (),
             }
@@ -77,49 +101,22 @@ where
 }
 
 pub trait WireItem {
-    fn encode(&self) -> Box<[u8]>;
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
 
     fn write_to<W: Write>(&self, w: &mut W, tlv_type: Option<u64>) -> std::io::Result<usize> {
         let mut count = 0;
-        let data = self.encode();
         match tlv_type {
             Some(t) => {
+                let mut data = Vec::new();
+                self.encode(&mut data)?;
                 count += write_varint(t, w)?;
                 count += write_varint(data.len() as u64, w)?;
+                count += w.write(&data)?;
             }
-            None => (),
+            None => {
+                count += self.encode(w)?;
+            }
         }
-        count += w.write(&data)?;
         Ok(count)
-    }
-}
-
-pub trait WireItemBoxedWriter {
-    fn write_to_boxed(
-        &self,
-        w: &mut Box<&mut dyn Write>,
-        tlv_type: Option<u64>,
-    ) -> std::io::Result<usize>;
-}
-
-impl<WI> WireItemBoxedWriter for WI
-where
-    WI: WireItem,
-{
-    fn write_to_boxed(
-        &self,
-        w: &mut Box<&mut dyn Write>,
-        tlv_type: Option<u64>,
-    ) -> std::io::Result<usize> {
-        self.write_to(w, tlv_type)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
     }
 }

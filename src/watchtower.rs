@@ -1,6 +1,8 @@
-use crate::{AnyWireMessage, EncodedItem, WireItem, WireMessage};
+use crate as lightning_wire_msgs;
+use lightning_wire_msgs::WireItem;
 use std::collections::BTreeSet;
-use std::io::Write;
+use std::convert::TryFrom;
+use std::io::{Read, Write};
 
 #[derive(AnyWireMessage)]
 pub enum AnyWatchtowerMessage {
@@ -14,7 +16,8 @@ pub struct Init {
     chain_hash: Hash,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, TryFromPrimitive)]
+#[repr(usize)]
 pub enum Feature {
     DataLossProtectRequired = 0,
     DataLossProtectOptional = 1,
@@ -58,6 +61,31 @@ impl WireItem for RawFeatureVector {
 
         Ok(count)
     }
+
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self> {
+        let mut len = [0_u8; 2];
+        r.read_exact(&mut len)?;
+        let len = u16::from_be_bytes(len);
+        let mut ret = BTreeSet::new();
+        if len == 0 {
+            return Ok(RawFeatureVector(ret));
+        }
+        let mut byte_idx = len as usize - 1;
+        for _ in 0..len {
+            let mut byte = [0_u8];
+            r.read_exact(&mut byte)?;
+            for bit_idx in 0..8 {
+                if byte[0] & (1 << bit_idx) != 0 {
+                    let feat = 8 * byte_idx + bit_idx;
+                    ret.insert(
+                        Feature::try_from(feat).map_err(|_| std::io::ErrorKind::InvalidData)?,
+                    );
+                }
+            }
+            byte_idx -= 1;
+        }
+        Ok(RawFeatureVector(ret))
+    }
 }
 
 pub struct Hash([u8; 32]);
@@ -66,5 +94,11 @@ impl WireItem for Hash {
         let count = w.write(&self.0)?;
         w.flush()?;
         Ok(count)
+    }
+
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self> {
+        let mut hash = [0_u8; 32];
+        r.read_exact(&mut hash)?;
+        Ok(Hash(hash))
     }
 }

@@ -19,12 +19,12 @@ Most lightning messages can be trivially implemented using the following derive 
 ### WireMessage
 
 #### Requirements
-Requires attribute: `#[msg_type = 123]` which defines the 2 byte number used to uniquely identify the message type.
-The type of each field must implement `WireItem`.
-Fields can be tagged with the `#[tlv_type = 123]` attribute.
-TLV field numbers must be monotonically increasing.
-TLV fields must be after non-TLV fields.
-TLV fields must be `Option`al.
+ - Requires attribute: `#[msg_type = 123]` which defines the 2 byte number used to uniquely identify the message type.
+ - The type of each field must implement `WireItem`.
+ - Fields can be tagged with the `#[tlv_type = 123]` attribute.
+ - TLV field numbers must be monotonically increasing.
+ - TLV fields must be after non-TLV fields.
+ - TLV fields must be `Option`al.
 
 #### Result
 Given a struct named MessageName:
@@ -36,8 +36,8 @@ Given a struct named MessageName:
 ### AnyWireMessage
 
 #### Requirements
-Must be an enum.
-Each variant must contain a single unnamed field that implements `WireMessage`.
+ - Must be an enum.
+ - Each variant must contain a single unnamed field that implements `WireMessage`.
 
 #### Result
-Implements `AnyWireMessage` for the enum.
+ - Implements `AnyWireMessage` for the enum.

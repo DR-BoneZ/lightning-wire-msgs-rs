@@ -9,6 +9,7 @@ extern crate num_enum;
 use std::io::{Read, Write};
 
 pub mod watchtower;
+pub mod wire_items;
 
 fn write_varint<W: Write>(num: u64, w: &mut W) -> std::io::Result<usize> {
     match num {

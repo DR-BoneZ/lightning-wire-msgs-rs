@@ -1,15 +1,10 @@
-#![feature(never_type)]
-
 #[macro_use]
 extern crate lightning_wire_msgs_derive;
 
-#[macro_use]
-extern crate num_enum;
-
 use std::io::{Read, Write};
 
+pub mod items;
 pub mod watchtower;
-pub mod wire_items;
 
 fn write_varint<W: Write>(num: u64, w: &mut W) -> std::io::Result<usize> {
     match num {
@@ -208,50 +203,53 @@ where
 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
 
-    fn write_to<W: Write>(&self, w: &mut W, tlv_type: Option<u64>) -> std::io::Result<usize> {
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self>;
+}
+
+pub trait TLVWireItem
+where
+    Self: Sized,
+{
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
+
+    fn write_to<W: Write>(&self, w: &mut W, tlv_type: u64) -> std::io::Result<usize> {
         let mut count = 0;
-        match tlv_type {
-            Some(t) => {
-                let mut data = Vec::new();
-                self.encode(&mut data)?;
-                count += write_varint(t, w)?;
-                count += write_varint(data.len() as u64, w)?;
-                count += w.write(&data)?;
-            }
-            None => {
-                count += self.encode(w)?;
-            }
-        }
+        let mut data = Vec::new();
+        self.encode(&mut data)?;
+        count += write_varint(tlv_type, w)?;
+        count += write_varint(data.len() as u64, w)?;
+        count += w.write(&data)?;
         Ok(count)
     }
 
-    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self>;
+    fn decode<R: Read>(r: &mut R, len: usize) -> std::io::Result<Self>;
 
     fn read_from<'a, R: Read>(
         reader: &mut PeekReader<'a, R>,
-        tlv_type: Option<u64>,
+        tlv_type: u64,
     ) -> std::io::Result<Option<Self>> {
-        if let Some(tlv_type) = tlv_type {
-            loop {
-                use std::cmp::Ordering::*;
+        loop {
+            use std::cmp::Ordering::*;
 
-                let t = peek_varint(reader)?;
-                match t.cmp(&tlv_type) {
-                    Greater => return Ok(None),
-                    Equal => {
-                        reader.flush_peeked();
-                        read_varint(reader)?;
-                        break;
-                    }
-                    Less => {
-                        reader.flush_peeked();
-                        let skip = read_varint(reader)? as usize;
-                        reader.read_exact(&mut vec![0_u8; skip])?;
-                    }
+            let t = match peek_varint(reader) {
+                Ok(t) => t,
+                Err(ref e) if e.kind() == std::io::ErrorKind::UnexpectedEof => return Ok(None),
+                Err(e) => return Err(e),
+            };
+            match t.cmp(&tlv_type) {
+                Greater => return Ok(None),
+                Equal => {
+                    reader.flush_peeked();
+                    let len = read_varint(reader)? as usize;
+                    return Ok(Some(Self::decode(reader, len)?));
+                }
+                Less => {
+                    reader.flush_peeked();
+                    let skip = read_varint(reader)? as usize;
+                    reader.read_exact(&mut vec![0_u8; skip])?;
                 }
             }
         }
-        Ok(Some(Self::decode(reader)?))
     }
 }
 
@@ -276,9 +274,22 @@ pub trait WireItemWriter {
     }
 }
 
-impl<T> WireItemWriter for T
+impl<T> TLVWireItem for T
 where
     T: WireItem,
+{
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+        self.encode(w)
+    }
+
+    fn decode<R: Read>(r: &mut R, _: usize) -> std::io::Result<Self> {
+        T::decode(r)
+    }
+}
+
+impl<T> WireItemWriter for T
+where
+    T: TLVWireItem,
 {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
         self.encode(w)

@@ -12,5 +12,4 @@ documentation = "https://docs.rs/lightning-wire-msgs/"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-wire-msgs-derive = "0.1.0"
-num_enum = "0.4.1"
+lightning-wire-msgs-derive = "0.1.1"

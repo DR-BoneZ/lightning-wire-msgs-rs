@@ -1,6 +1,6 @@
 [package]
 name = "lightning-wire-msgs"
-version = "0.1.2"
+version = "0.2.0"
 authors = ["Aiden McClelland <me@drbonez.dev>"]
 edition = "2018"
 description = "bitcoin lightning wire message types"
@@ -12,4 +12,4 @@ documentation = "https://docs.rs/lightning-wire-msgs/"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-lightning-wire-msgs-derive = "0.1.1"
+lightning-wire-msgs-derive = "0.2.0"

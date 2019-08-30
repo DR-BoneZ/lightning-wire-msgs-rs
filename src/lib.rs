@@ -76,85 +76,114 @@ fn peek_varint<'a, R: Read>(r: &mut PeekReader<'a, R>) -> std::io::Result<u64> {
     })
 }
 
-pub enum EncodedItem<T> {
-    Expected(T),
-    TLV(Option<T>, u64),
-}
-impl<'a, T, U> From<(&'a Option<T>, u64)> for EncodedItem<U>
-where
-    U: From<&'a T>,
-{
-    fn from(tup: (&'a Option<T>, u64)) -> Self {
-        EncodedItem::TLV(tup.0.as_ref().map(U::from), tup.1)
-    }
-}
-impl<'a, T, U> From<(&'a T,)> for EncodedItem<U>
-where
-    U: From<&'a T>,
-{
-    fn from(tup: (&'a T,)) -> Self {
-        EncodedItem::Expected(U::from(tup.0))
-    }
+pub trait AnyWireMessageWriter {
+    fn msg_type(&self) -> u16;
+
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
 }
 
-pub trait AnyWireMessage<'a>
+pub trait AnyWireMessageReader
 where
     Self: Sized,
 {
     fn msg_type(&self) -> u16;
 
-    fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize>;
-
-    fn read_from<R: Read>(r: &mut R) -> std::io::Result<Self>;
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self>;
 }
 
-impl<'a, T> AnyWireMessage<'a> for T
+pub trait AnyWireMessage
 where
-    T: WireMessage<'a>,
-    &'a T: IntoIterator<Item = EncodedItem<T::Item>> + 'a,
+    Self: Sized,
+{
+    fn msg_type(&self) -> u16;
+
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
+
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self>;
+}
+impl<T> AnyWireMessageWriter for T
+where
+    T: AnyWireMessage,
+{
+    fn msg_type(&self) -> u16 {
+        self.msg_type()
+    }
+
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+        self.encode(w)
+    }
+}
+impl<T> AnyWireMessageReader for T
+where
+    T: AnyWireMessage,
+{
+    fn msg_type(&self) -> u16 {
+        self.msg_type()
+    }
+
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self> {
+        Self::decode(r)
+    }
+}
+
+impl<T> AnyWireMessage for T
+where
+    T: WireMessage,
 {
     fn msg_type(&self) -> u16 {
         T::MSG_TYPE
     }
 
-    fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize> {
-        self.write_to(w)
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+        self.encode(w)
     }
 
-    fn read_from<R: Read>(r: &mut R) -> std::io::Result<Self> {
-        T::read_from(r, true)
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self> {
+        T::decode(r, true)
     }
 }
 
-pub trait WireMessage<'a>
+pub trait WireMessageWriter {
+    const MSG_TYPE: u16;
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
+}
+
+pub trait WireMessageReader
 where
-    &'a Self: IntoIterator<Item = EncodedItem<Self::Item>> + 'a,
     Self: Sized,
 {
-    type Item: WireItemWriter;
+    const MSG_TYPE: u16;
+    fn decode<R: Read>(r: &mut R, check_type: bool) -> std::io::Result<Self>;
+}
 
+pub trait WireMessage
+where
+    Self: Sized,
+{
     const MSG_TYPE: u16;
 
-    fn write_to<W: Write>(&'a self, w: &mut W) -> std::io::Result<usize> {
-        let mut count = 0;
-        count += w.write(&u16::to_be_bytes(Self::MSG_TYPE))?;
-        let mut boxed_w: Box<&mut dyn Write> = Box::new(w);
-        for item in (&self).into_iter() {
-            match item {
-                EncodedItem::Expected(t) => {
-                    count += t.write_to(&mut boxed_w, None)?;
-                }
-                EncodedItem::TLV(Some(t), tlv_type) => {
-                    count += t.write_to(&mut boxed_w, Some(tlv_type))?;
-                }
-                _ => (),
-            }
-        }
-        w.flush()?;
-        Ok(count)
-    }
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
 
-    fn read_from<R: Read>(r: &mut R, check_type: bool) -> std::io::Result<Self>;
+    fn decode<R: Read>(r: &mut R, check_type: bool) -> std::io::Result<Self>;
+}
+impl<T> WireMessageWriter for T
+where
+    T: WireMessage,
+{
+    const MSG_TYPE: u16 = T::MSG_TYPE;
+
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+        self.encode(w)
+    }
+}
+impl<T> WireMessageReader for T
+where
+    T: WireMessage,
+{
+    const MSG_TYPE: u16 = T::MSG_TYPE;
+    fn decode<R: Read>(r: &mut R, check_type: bool) -> std::io::Result<Self> {
+        Self::decode(r, check_type)
+    }
 }
 
 pub struct PeekReader<'a, R: Read> {
@@ -197,6 +226,17 @@ impl<'a, R: Read> Read for PeekReader<'a, R> {
     }
 }
 
+pub trait WireItemWriter {
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
+}
+
+pub trait WireItemReader
+where
+    Self: Sized,
+{
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self>;
+}
+
 pub trait WireItem
 where
     Self: Sized,
@@ -205,14 +245,19 @@ where
 
     fn decode<R: Read>(r: &mut R) -> std::io::Result<Self>;
 }
-
-pub trait TLVWireItem
+impl<T> WireItemReader for T
 where
-    Self: Sized,
+    T: WireItem,
 {
+    fn decode<R: Read>(r: &mut R) -> std::io::Result<Self> {
+        T::decode(r)
+    }
+}
+
+pub trait TLVWireItemWriter {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
 
-    fn write_to<W: Write>(&self, w: &mut W, tlv_type: u64) -> std::io::Result<usize> {
+    fn encode_tlv<W: Write>(&self, w: &mut W, tlv_type: u64) -> std::io::Result<usize> {
         let mut count = 0;
         let mut data = Vec::new();
         self.encode(&mut data)?;
@@ -221,10 +266,15 @@ where
         count += w.write(&data)?;
         Ok(count)
     }
+}
 
+pub trait TLVWireItemReader
+where
+    Self: Sized,
+{
     fn decode<R: Read>(r: &mut R, len: usize) -> std::io::Result<Self>;
 
-    fn read_from<'a, R: Read>(
+    fn decode_tlv<'a, R: Read>(
         reader: &mut PeekReader<'a, R>,
         tlv_type: u64,
     ) -> std::io::Result<Option<Self>> {
@@ -253,24 +303,28 @@ where
     }
 }
 
-pub trait WireItemWriter {
+pub trait TLVWireItem
+where
+    Self: Sized,
+{
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize>;
 
-    fn write_to<W: Write>(&self, w: &mut W, tlv_type: Option<u64>) -> std::io::Result<usize> {
-        let mut count = 0;
-        match tlv_type {
-            Some(t) => {
-                let mut data = Vec::new();
-                self.encode(&mut data)?;
-                count += write_varint(t, w)?;
-                count += write_varint(data.len() as u64, w)?;
-                count += w.write(&data)?;
-            }
-            None => {
-                count += self.encode(w)?;
-            }
-        }
-        Ok(count)
+    fn decode<R: Read>(r: &mut R, len: usize) -> std::io::Result<Self>;
+}
+impl<T> TLVWireItemWriter for T
+where
+    T: TLVWireItem,
+{
+    fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+        self.encode(w)
+    }
+}
+impl<T> TLVWireItemReader for T
+where
+    T: TLVWireItem,
+{
+    fn decode<R: Read>(r: &mut R, len: usize) -> std::io::Result<Self> {
+        T::decode(r, len)
     }
 }
 
@@ -286,7 +340,6 @@ where
         T::decode(r)
     }
 }
-
 impl<T> WireItemWriter for T
 where
     T: TLVWireItem,

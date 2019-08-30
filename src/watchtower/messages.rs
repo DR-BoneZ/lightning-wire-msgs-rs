@@ -14,6 +14,8 @@ pub enum AnyWatchtowerMessage<T: Borrow<[u8]>> {
 pub struct Init {
     conn_features: RawFeatureVector,
     chain_hash: Hash,
+    #[tlv_type = 0]
+    ch: Option<Hash>,
 }
 
 #[derive(Clone, Debug, WireMessage)]

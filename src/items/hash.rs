@@ -2,7 +2,7 @@ use crate::WireItem;
 use std::io::{Read, Write};
 
 #[derive(Clone, Debug)]
-pub struct Hash([u8; 32]);
+pub struct Hash(pub [u8; 32]);
 impl WireItem for Hash {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
         let count = w.write(&self.0)?;

@@ -348,3 +348,23 @@ where
         self.encode(w)
     }
 }
+
+#[test]
+fn bench() {
+    use watchtower::messages::Init;
+    let mut features = items::feature::RawFeatureVector::new();
+    features.add(items::feature::Feature::DataLossProtectRequired);
+    features.add(items::feature::Feature::GossipQueriesRequired);
+    features.add(items::feature::Feature::InitialRoutingSync);
+    let mut init = Init {
+        conn_features: features,
+        chain_hash: items::hash::Hash([0; 32]),
+    };
+    let dur = std::time::Instant::now();
+    for _ in 0..1_000_000 {
+        let mut buf = Vec::new();
+        <Init as WireMessageWriter>::encode(&init, &mut buf).expect("encode");
+        init = WireMessageReader::decode(&mut std::io::Cursor::new(buf), true).expect("decode");
+    }
+    println!("{:?}", dur.elapsed());
+}

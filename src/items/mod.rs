@@ -1,4 +1,5 @@
 pub mod feature;
+pub mod fees;
 pub mod hash;
 
 use crate::{TLVWireItem, WireItem};

@@ -20,6 +20,14 @@ impl Feature {
 
 #[derive(Clone, Debug)]
 pub struct RawFeatureVector(pub BTreeSet<Feature>);
+impl RawFeatureVector {
+    pub fn new() -> Self {
+        RawFeatureVector(BTreeSet::new())
+    }
+    pub fn add(&mut self, f: Feature) -> bool {
+        self.0.insert(f)
+    }
+}
 impl WireItem for RawFeatureVector {
     fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
         let len = self

@@ -1,5 +1,4 @@
 use crate::WireItem;
-use std::convert::TryFrom;
 use std::io::{Read, Write};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]

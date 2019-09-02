@@ -66,8 +66,9 @@ impl WireItem for RawFeatureVector {
         if len == 0 {
             return Ok(RawFeatureVector(ret));
         }
-        let mut byte_idx = len as usize - 1;
+        let mut byte_idx = len as usize;
         for _ in 0..len {
+            byte_idx -= 1;
             let mut byte = [0_u8];
             r.read_exact(&mut byte)?;
             for bit_idx in 0..8 {
@@ -78,7 +79,6 @@ impl WireItem for RawFeatureVector {
                     );
                 }
             }
-            byte_idx -= 1;
         }
         Ok(RawFeatureVector(ret))
     }

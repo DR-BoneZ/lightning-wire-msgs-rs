@@ -77,3 +77,14 @@ Most lightning messages can be trivially implemented using the following derive 
  - Each variant must contain a single unnamed field that implements `WireMessageWriter + WireMessageReader`.
    - For `AnyWireMessageWriter`, only requires `WireMessageWriter`.
    - For `AnyWireMessageReader`, only requires `WireMessageReader`.
+
+## Benchmark
+Tested 1,000,000 serializations and deserializations of the `watchtower::Init` message, for both this crate and lnd with the following results:
+ - lightning-wire-msgs: `387.640625ms`
+ - lnd: `1.349666231s`
+
+Code for lnd benchmark can be found at `bench/bench.go`.
+
+Code for crate benchmark can be found at the end of `src/lib.rs`.
+
+I urge anyone else to verify these benchmarks, however I am fairly confident at this point that my crate cuts serialization + deserialization time down by about 70%. 

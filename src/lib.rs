@@ -360,11 +360,15 @@ fn bench() {
         conn_features: features,
         chain_hash: items::hash::Hash([0; 32]),
     };
-    let dur = std::time::Instant::now();
+    let mut expected = Vec::new();
+    <Init as WireMessageWriter>::encode(&init, &mut expected).expect("encode");
+    let now = std::time::Instant::now();
+    let mut buf = Vec::new();
     for _ in 0..1_000_000 {
-        let mut buf = Vec::new();
+        buf.truncate(0);
         <Init as WireMessageWriter>::encode(&init, &mut buf).expect("encode");
-        init = WireMessageReader::decode(&mut std::io::Cursor::new(buf), true).expect("decode");
+        assert!(&buf == &expected);
+        init = WireMessageReader::decode(&mut std::io::Cursor::new(&buf), true).expect("decode");
     }
-    println!("{:?}", dur.elapsed());
+    println!("{:?}", now.elapsed());
 }

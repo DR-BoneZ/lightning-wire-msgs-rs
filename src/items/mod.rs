@@ -30,6 +30,30 @@ macro_rules! impl_wire_item_for_nums {
     };
 }
 
+macro_rules! impl_wire_item_for_byte_array {
+    (
+        $(
+            $(#[$attr:meta])*
+            [u8; $bytes:literal],
+        )*
+    ) => {
+        $(
+            $(#[$attr])*
+            impl WireItem for [u8; $bytes] {
+                fn encode<W: Write>(&self, w: &mut W) -> std::io::Result<usize> {
+                    w.write(self)
+                }
+
+                fn decode<R: Read>(r: &mut R) -> std::io::Result<Self> {
+                   let mut buf = [0_u8; $bytes];
+                   r.read_exact(&mut buf)?;
+                    Ok(buf)
+                }
+            }
+        )*
+    };
+}
+
 impl_wire_item_for_nums!(
     u8[1],
     i8[1],
@@ -54,6 +78,8 @@ impl_wire_item_for_nums!(
     #[cfg(target_pointer_width = "64")]
     isize[8],
 );
+
+impl_wire_item_for_byte_array!([u8; 16],);
 
 pub enum MaybeOwned<'a, O: Borrow<B>, B> {
     Owned(O),

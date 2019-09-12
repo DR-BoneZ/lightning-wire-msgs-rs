@@ -59,19 +59,34 @@ where
         }
     }
 }
-#[derive(Clone, Copy, Debug, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u16)]
 pub enum BaseError {
     OK = 0,
     TemporaryFailure = 40,
     PermanentFailure = 50,
 }
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<u16> for BaseError {
+    type Error = u16;
+    fn try_from(prim: u16) -> Result<Self, Self::Error> {
+        const C0: u16 = BaseError::OK as u16;
+        const C1: u16 = BaseError::TemporaryFailure as u16;
+        const C2: u16 = BaseError::PermanentFailure as u16;
+        match prim {
+            C0 => Ok(BaseError::OK),
+            C1 => Ok(BaseError::TemporaryFailure),
+            C2 => Ok(BaseError::PermanentFailure),
+            _ => Err(prim),
+        }
+    }
+}
 impl From<BaseError> for ErrorCode {
     fn from(code: BaseError) -> ErrorCode {
         ErrorCode(code as u16)
     }
 }
-#[derive(Clone, Copy, Debug, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u16)]
 pub enum CreateSessionError {
     AlreadyExists = 60,
@@ -80,27 +95,72 @@ pub enum CreateSessionError {
     RejectSweepFeeRate = 63,
     RejectBlobType = 64,
 }
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<u16> for CreateSessionError {
+    type Error = u16;
+    fn try_from(prim: u16) -> Result<Self, Self::Error> {
+        const C0: u16 = CreateSessionError::AlreadyExists as u16;
+        const C1: u16 = CreateSessionError::RejectMaxUpdates as u16;
+        const C2: u16 = CreateSessionError::RejectRewardRate as u16;
+        const C3: u16 = CreateSessionError::RejectSweepFeeRate as u16;
+        const C4: u16 = CreateSessionError::RejectBlobType as u16;
+        match prim {
+            C0 => Ok(CreateSessionError::AlreadyExists),
+            C1 => Ok(CreateSessionError::RejectMaxUpdates),
+            C2 => Ok(CreateSessionError::RejectRewardRate),
+            C3 => Ok(CreateSessionError::RejectSweepFeeRate),
+            C4 => Ok(CreateSessionError::RejectBlobType),
+            _ => Err(prim),
+        }
+    }
+}
 impl From<CreateSessionError> for ErrorCode {
     fn from(code: CreateSessionError) -> ErrorCode {
         ErrorCode(code as u16)
     }
 }
-#[derive(Clone, Copy, Debug, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u16)]
 pub enum StateUpdateError {
     ClientBehind = 70,
     MaxUpdatesExceeded = 71,
     SeqNumOutOfOrder = 72,
 }
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<u16> for StateUpdateError {
+    type Error = u16;
+    fn try_from(prim: u16) -> Result<Self, Self::Error> {
+        const C0: u16 = StateUpdateError::ClientBehind as u16;
+        const C1: u16 = StateUpdateError::MaxUpdatesExceeded as u16;
+        const C2: u16 = StateUpdateError::SeqNumOutOfOrder as u16;
+        match prim {
+            C0 => Ok(StateUpdateError::ClientBehind),
+            C1 => Ok(StateUpdateError::MaxUpdatesExceeded),
+            C2 => Ok(StateUpdateError::SeqNumOutOfOrder),
+            _ => Err(prim),
+        }
+    }
+}
 impl From<StateUpdateError> for ErrorCode {
     fn from(code: StateUpdateError) -> ErrorCode {
         ErrorCode(code as u16)
     }
 }
-#[derive(Clone, Copy, Debug, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug)]
 #[repr(u16)]
 pub enum DeleteSessionError {
     NotFound = 80,
+}
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<u16> for DeleteSessionError {
+    type Error = u16;
+    fn try_from(prim: u16) -> Result<Self, Self::Error> {
+        const C0: u16 = DeleteSessionError::NotFound as u16;
+        match prim {
+            C0 => Ok(DeleteSessionError::NotFound),
+            _ => Err(prim),
+        }
+    }
 }
 impl From<DeleteSessionError> for ErrorCode {
     fn from(code: DeleteSessionError) -> ErrorCode {

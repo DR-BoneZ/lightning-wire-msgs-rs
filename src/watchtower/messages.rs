@@ -63,7 +63,9 @@ pub struct StateUpdateReply {
 
 #[derive(Debug, Clone, WireMessage)]
 #[msg_type = 606]
-pub struct DeleteSession;
+pub struct DeleteSession {
+    pub data: (),
+}
 
 #[derive(Debug, Clone, WireMessage)]
 #[msg_type = 607]

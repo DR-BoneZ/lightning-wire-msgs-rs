@@ -1,19 +1,15 @@
 #[cfg(feature = "expand")]
 mod expand {
     use {
-        lightning_wire_msgs_derive_base::{
-            any_wire_message_derive, any_wire_message_reader_derive,
-            any_wire_message_writer_derive, try_from_derive, wire_message_derive,
-            wire_message_reader_derive, wire_message_writer_derive,
-        },
+        lightning_wire_msgs_derive_base::{any_wire_msg, try_from, wire_msg},
         proc_macro2::TokenStream,
         std::env,
         std::fs::File,
         std::io::{Read, Write},
         std::path::Path,
+        syn::visit_mut::VisitMut,
     };
 
-    #[derive(Debug)]
     enum Derives {
         TryFromPrimitive,
         WireMessage,
@@ -23,14 +19,86 @@ mod expand {
         AnyWireMessageReader,
         AnyWireMessageWriter,
     }
+    impl Derives {
+        pub fn as_str(&self) -> &'static str {
+            use Derives::*;
+            match self {
+                TryFromPrimitive => "TryFromPrimitive",
+                WireMessage => "WireMessage",
+                WireMessageReader => "WireMessageReader",
+                WireMessageWriter => "WireMessageWriter",
+                AnyWireMessage => "AnyWireMessage",
+                AnyWireMessageReader => "AnyWireMessageReader",
+                AnyWireMessageWriter => "AnyWireMessageWriter",
+            }
+        }
+        pub fn is_any(path: &syn::Path) -> bool {
+            use Derives::*;
+            match path {
+                p if p.is_ident(TryFromPrimitive.as_str()) => true,
+                p if p.is_ident(WireMessage.as_str()) => true,
+                p if p.is_ident(WireMessageWriter.as_str()) => true,
+                p if p.is_ident(WireMessageReader.as_str()) => true,
+                p if p.is_ident(AnyWireMessage.as_str()) => true,
+                p if p.is_ident(AnyWireMessageWriter.as_str()) => true,
+                p if p.is_ident(AnyWireMessageReader.as_str()) => true,
+                _ => false,
+            }
+        }
+    }
+
+    fn strip_derives(attrs: Vec<syn::Attribute>) -> Vec<syn::Attribute> {
+        attrs
+            .into_iter()
+            .filter_map(|mut a| match &a.parse_meta() {
+                Ok(syn::Meta::NameValue(b)) if b.path.is_ident("msg_type") => None,
+                Ok(syn::Meta::List(b)) if b.path.is_ident("derive") => {
+                    let nested: syn::punctuated::Punctuated<_, syn::token::Comma> = b
+                        .nested
+                        .iter()
+                        .filter(|m| match m {
+                            syn::NestedMeta::Meta(m) => !Derives::is_any(m.path()),
+                            _ => true,
+                        })
+                        .cloned()
+                        .collect();
+                    if nested.is_empty() {
+                        return None;
+                    }
+                    a.tokens = quote::quote!((#nested));
+                    Some(a)
+                }
+                _ => Some(a),
+            })
+            .collect()
+    }
+
+    fn add_auto_derive_doc(i: &mut syn::Item) {
+        match i {
+            syn::Item::Impl(i) => i.attrs.push(syn::Attribute {
+                pound_token: syn::Token![#](proc_macro2::Span::call_site()),
+                style: syn::AttrStyle::Outer,
+                bracket_token: syn::token::Bracket(proc_macro2::Span::call_site()),
+                path: syn::Path::from(syn::Ident::new("doc", proc_macro2::Span::call_site())),
+                tokens: quote::quote!(= "automatically generated"),
+            }),
+            _ => (),
+        };
+    }
+
+    struct StripTLVTypes;
+    impl VisitMut for StripTLVTypes {
+        fn visit_field_mut(&mut self, i: &mut syn::Field) {
+            i.attrs.retain(|a| !a.path.is_ident("tlv_type"));
+        }
+    }
 
     struct Expander(syn::File);
     impl Expander {
         pub fn new<R: Read>(r: &mut R) -> Self {
             use std::str::FromStr;
-            use syn::parse::Parse;
             let mut s = String::new();
-            r.read_to_string(&mut s);
+            r.read_to_string(&mut s).expect("read");
             Expander(
                 syn::parse2(TokenStream::from_str(&s).expect("parse error")).expect("parse error"),
             )
@@ -39,14 +107,107 @@ mod expand {
             use quote::ToTokens;
             let items = self.0.items;
             self.0.items = Vec::with_capacity(items.len());
-            for item in items {
-                // match &tree {
-                //     TokenTree::Group(g) => {
-                //         // let trees: Vec<_> = g.stream().into_iter().collect();
-                //     }
-                //     _ => (),
-                // }
-                self.0.items.push(item);
+            for mut item in items {
+                match &mut item {
+                    syn::Item::ExternCrate(a) if a.ident == "lightning_wire_msgs_derive" => (),
+                    syn::Item::Struct(ref mut a) => {
+                        StripTLVTypes.visit_item_struct_mut(a);
+                        let mut new_item = a.clone();
+                        new_item.attrs = strip_derives(new_item.attrs);
+                        self.0.items.push(syn::Item::Struct(new_item));
+                        for func in a
+                            .attrs
+                            .iter()
+                            .filter_map(|a| a.parse_meta().ok())
+                            .filter_map(|a| match a {
+                                syn::Meta::List(a) => Some(a),
+                                _ => None,
+                            })
+                            .filter(|a| a.path.is_ident("derive"))
+                            .flat_map(|a| a.nested.iter().cloned().collect::<Vec<_>>())
+                            .filter_map(|a| match a {
+                                syn::NestedMeta::Meta(syn::Meta::Path(a)) => Some(a),
+                                _ => None,
+                            })
+                            .filter_map(|a| match &a {
+                                a if a.is_ident(Derives::WireMessage.as_str()) => Some(
+                                    wire_msg::impl_trait
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                a if a.is_ident(Derives::WireMessageWriter.as_str()) => Some(
+                                    wire_msg::impl_writer
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                a if a.is_ident(Derives::WireMessageReader.as_str()) => Some(
+                                    wire_msg::impl_reader
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                _ => None,
+                            })
+                            .next()
+                        {
+                            let mut i = syn::parse2(func(
+                                &syn::parse2(item.to_token_stream())
+                                    .expect("convert to derive input"),
+                            ))
+                            .expect("parse macro output");
+                            add_auto_derive_doc(&mut i);
+                            self.0.items.push(i);
+                        }
+                    }
+                    syn::Item::Enum(a) => {
+                        let mut new_item = a.clone();
+                        new_item.attrs = strip_derives(new_item.attrs);
+                        self.0.items.push(syn::Item::Enum(new_item));
+                        match a
+                            .attrs
+                            .iter()
+                            .filter_map(|a| a.parse_meta().ok())
+                            .filter_map(|a| match a {
+                                syn::Meta::List(a) => Some(a),
+                                _ => None,
+                            })
+                            .filter(|a| a.path.is_ident("derive"))
+                            .flat_map(|a| a.nested.iter().cloned().collect::<Vec<_>>())
+                            .filter_map(|a| match a {
+                                syn::NestedMeta::Meta(syn::Meta::Path(a)) => Some(a),
+                                _ => None,
+                            })
+                            .filter_map(|a| match &a {
+                                a if a.is_ident(Derives::TryFromPrimitive.as_str()) => Some(
+                                    try_from::impl_trait
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                a if a.is_ident(Derives::AnyWireMessage.as_str()) => Some(
+                                    any_wire_msg::impl_trait
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                a if a.is_ident(Derives::AnyWireMessageWriter.as_str()) => Some(
+                                    any_wire_msg::impl_writer
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                a if a.is_ident(Derives::AnyWireMessageReader.as_str()) => Some(
+                                    any_wire_msg::impl_reader
+                                        as fn(ast: &syn::DeriveInput) -> TokenStream,
+                                ),
+                                _ => None,
+                            })
+                            .next()
+                        {
+                            Some(func) => {
+                                let mut i = syn::parse2(func(
+                                    &syn::parse2(item.to_token_stream())
+                                        .expect("convert to derive input"),
+                                ))
+                                .expect("parse macro output");
+                                add_auto_derive_doc(&mut i);
+                                self.0.items.push(i);
+                            }
+                            _ => (),
+                        };
+                    }
+                    _ => self.0.items.push(item),
+                }
             }
             w.write(format!("{}", self.0.to_token_stream()).as_bytes())?;
             Ok(())

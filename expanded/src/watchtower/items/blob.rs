@@ -1,11 +1,24 @@
 use crate::WireItem;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(u16)]
 pub enum Flag {
     Reward = 0,
     CommitOutputs = 1,
+}
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<u16> for Flag {
+    type Error = u16;
+    fn try_from(prim: u16) -> Result<Self, Self::Error> {
+        const C0: u16 = Flag::Reward as u16;
+        const C1: u16 = Flag::CommitOutputs as u16;
+        match prim {
+            C0 => Ok(Flag::Reward),
+            C1 => Ok(Flag::CommitOutputs),
+            _ => Err(prim),
+        }
+    }
 }
 impl Flag {
     pub const fn flag(&self) -> u16 {
@@ -86,11 +99,24 @@ impl std::fmt::Display for Type {
         Ok(())
     }
 }
-#[derive(Clone, Copy, Debug, PartialEq, Eq, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum KnownType {
     TypeAltruistCommit = Flag::CommitOutputs.flag(),
     TypeRewardCommit = Flag::CommitOutputs.flag() | Flag::Reward.flag(),
+}
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<u16> for KnownType {
+    type Error = u16;
+    fn try_from(prim: u16) -> Result<Self, Self::Error> {
+        const C0: u16 = KnownType::TypeAltruistCommit as u16;
+        const C1: u16 = KnownType::TypeRewardCommit as u16;
+        match prim {
+            C0 => Ok(KnownType::TypeAltruistCommit),
+            C1 => Ok(KnownType::TypeRewardCommit),
+            _ => Err(prim),
+        }
+    }
 }
 impl From<KnownType> for u16 {
     fn from(t: KnownType) -> Self {

@@ -2,7 +2,7 @@ use crate::WireItem;
 use std::collections::BTreeSet;
 use std::convert::TryFrom;
 use std::io::{Read, Write};
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, TryFromPrimitive)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(usize)]
 pub enum Feature {
     DataLossProtectRequired = 0,
@@ -10,6 +10,25 @@ pub enum Feature {
     InitialRoutingSync = 3,
     GossipQueriesRequired = 6,
     GossipQueriesOptional = 7,
+}
+#[doc = "automatically generated"]
+impl std::convert::TryFrom<usize> for Feature {
+    type Error = usize;
+    fn try_from(prim: usize) -> Result<Self, Self::Error> {
+        const C0: usize = Feature::DataLossProtectRequired as usize;
+        const C1: usize = Feature::DataLossProtectOptional as usize;
+        const C2: usize = Feature::InitialRoutingSync as usize;
+        const C3: usize = Feature::GossipQueriesRequired as usize;
+        const C4: usize = Feature::GossipQueriesOptional as usize;
+        match prim {
+            C0 => Ok(Feature::DataLossProtectRequired),
+            C1 => Ok(Feature::DataLossProtectOptional),
+            C2 => Ok(Feature::InitialRoutingSync),
+            C3 => Ok(Feature::GossipQueriesRequired),
+            C4 => Ok(Feature::GossipQueriesOptional),
+            _ => Err(prim),
+        }
+    }
 }
 impl Feature {
     pub fn idx(&self) -> usize {

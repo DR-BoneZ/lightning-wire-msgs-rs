@@ -1,5 +1,3 @@
-#[macro_use]
-extern crate lightning_wire_msgs_derive;
 use std::io::{Read, Write};
 pub mod items;
 pub mod watchtower;

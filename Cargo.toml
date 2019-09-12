@@ -1,5 +1,5 @@
 [package]
-name = "lightning-wire-msgs"
+name = "lightning-wire-msgs-base"
 version = "0.2.1"
 authors = ["Aiden McClelland <me@drbonez.dev>"]
 edition = "2018"
@@ -11,5 +11,15 @@ documentation = "https://docs.rs/lightning-wire-msgs/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+expand = ["lightning-wire-msgs-derive-base", "rustfmt-nightly", "syn", "proc-macro2", "quote"]
+
 [dependencies]
 lightning-wire-msgs-derive = "0.2.3"
+
+[build-dependencies]
+lightning-wire-msgs-derive-base = { version = "0.2.4", optional = true }
+rustfmt-nightly = { version = "1.4.8", optional = true }
+syn = { version = "1.0.5", optional = true }
+proc-macro2 = { version = "1.0.1", optional = true } 
+quote = { version = "1.0.2", optional = true }

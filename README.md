@@ -1,6 +1,9 @@
 # Lightning Wire Messages
 A crate defining serialization and deserialization for lightning wire messages into rust structs.
 
+## Build
+To expand all macros from `lightning-wire-msgs-derive` run `cargo build --features expanded`, and it will produce a new project with expanded macros at `$OUTPUT_DIR/expanded`. `OUTPUT_DIR` is by default your current working directory.
+
 ## Usage
 This crate defines the following traits:
 

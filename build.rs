@@ -275,11 +275,40 @@ mod expand {
                 }
             })
             .expect("create output dir");
-
-        std::fs::copy(cwd.join("Cargo_expanded.toml"), out_path.join("Cargo.toml"))
-            .expect("copy Cargo.toml");
+        {
+            use std::str::FromStr;
+            let mut in_cargo = File::open(cwd.join("Cargo.toml")).expect("open Cargo.toml");
+            let mut out_cargo = File::create(out_path.join("Cargo.toml"))
+                .or_else(|_| File::open(out_path.join("Cargo.toml")))
+                .expect("open expanded/Cargo.toml");
+            let mut s = String::new();
+            in_cargo.read_to_string(&mut s).expect("read Cargo.toml");
+            let mut cargo = toml::Value::from_str(&s).expect("deserialize toml");
+            cargo["package"]["name"] = toml::Value::String("lightning-wire-msgs".to_owned());
+            cargo["dependencies"]
+                .as_table_mut()
+                .map(|a| a.remove("lightning-wire-msgs-derive"));
+            match cargo["dependencies"].as_table() {
+                Some(a) if a.is_empty() => {
+                    cargo.as_table_mut().map(|a| a.remove("dependencies"));
+                }
+                _ => (),
+            }
+            cargo["features"].as_table_mut().map(|a| a.remove("expand"));
+            match cargo["features"].as_table() {
+                Some(a) if a.is_empty() => {
+                    cargo.as_table_mut().map(|a| a.remove("features"));
+                }
+                _ => (),
+            }
+            cargo.as_table_mut().map(|a| a.remove("build-dependencies"));
+            let s = toml::ser::to_vec(&cargo).expect("serialize toml");
+            out_cargo.write(&s).expect("write Cargo.toml");
+        }
         std::fs::copy(cwd.join(".gitignore"), out_path.join(".gitignore"))
             .expect("copy .gitignore");
+        std::fs::copy(cwd.join("README_EXP.md"), out_path.join("README.md")).expect("copy README");
+        std::fs::copy(cwd.join("LICENSE"), out_path.join("LICENSE")).expect("copy LICENSE");
 
         out_path.push("src");
         process_dir(in_path, out_path, "");

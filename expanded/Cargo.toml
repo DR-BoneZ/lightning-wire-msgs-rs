@@ -1,12 +1,10 @@
 [package]
-name = "lightning-wire-msgs"
-version = "0.2.1"
 authors = ["Aiden McClelland <me@drbonez.dev>"]
-edition = "2018"
 description = "bitcoin lightning wire message types"
-license = "Apache-2.0"
-keywords = ["bitcoin", "lightning", "message", "serialization", "deserialization"]
-readme = "README.md"
 documentation = "https://docs.rs/lightning-wire-msgs/"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+edition = "2018"
+keywords = ["bitcoin", "lightning", "message", "serialization", "deserialization"]
+license = "Apache-2.0"
+name = "lightning-wire-msgs"
+readme = "README.md"
+version = "0.2.1"

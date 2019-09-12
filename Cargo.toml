@@ -12,7 +12,7 @@ documentation = "https://docs.rs/lightning-wire-msgs/"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-expand = ["lightning-wire-msgs-derive-base", "rustfmt-nightly", "syn", "proc-macro2", "quote"]
+expand = ["lightning-wire-msgs-derive-base", "rustfmt-nightly", "syn", "proc-macro2", "quote", "toml"]
 
 [dependencies]
 lightning-wire-msgs-derive = "0.2.6"
@@ -23,3 +23,4 @@ rustfmt-nightly = { version = "1.4.8", optional = true }
 syn = { version = "1.0.5", optional = true, features = ["full", "visit-mut"] }
 proc-macro2 = { version = "1.0.1", optional = true } 
 quote = { version = "1.0.2", optional = true }
+toml = { version = "0.5.3", optional = true }
